@@ -447,6 +447,7 @@ describe('synthetic end-to-end delivery contract', (): void => {
       name === 'token' ? 'input-token' : '',
     )
     vi.stubEnv('GITHUB_TOKEN', '')
+    vi.stubEnv('GITHUB_API_URL', undefined)
     const delivery = await Delivery.create(
       'tests/fixtures/config.json',
       new Report(),
