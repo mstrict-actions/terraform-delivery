@@ -1,0 +1,51 @@
+{
+  "name": "@mstrict-actions/terraform-delivery",
+  "description": "Verified Terraform preview and deployment",
+  "version": "0.0.0",
+  "type": "module",
+  "private": true,
+  "homepage": "https://github.com/mstrict-actions/terraform-delivery",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mstrict-actions/terraform-delivery.git"
+  },
+  "bugs": {
+    "url": "https://github.com/mstrict-actions/terraform-delivery/issues"
+  },
+  "engines": {
+    "node": ">=24.12.0 <25"
+  },
+  "scripts": {
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "eslint --max-warnings 0 .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "coverage": "vitest run --coverage",
+    "build": "node build.config.mjs",
+    "check": "npm run format:check && npm run lint && npm run typecheck && npm test",
+    "check-dist": "npm run build && node scripts/check-dist.ts",
+    "lint:fix": "npm run lint -- --fix",
+    "check:ci": "npm run format:check && npm run lint && npm run typecheck && npm run coverage"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@actions/core": "^3.0.1",
+    "@aws-sdk/client-s3": "^3.1146.0",
+    "lossless-json": "^4.3.1"
+  },
+  "devDependencies": {
+    "@mstrict-actions/dev-tools": "git+https://github.com/mstrict-actions/dev-tools.git#0.5",
+    "@smithy/util-stream": "^4.8.2",
+    "@types/node": "^24.19.1",
+    "@vitest/coverage-v8": "^5.0.3",
+    "aws-sdk-client-mock": "^4.1.0",
+    "esbuild": "^0.28.2",
+    "eslint": "^10.12.0",
+    "prettier": "^3.9.9",
+    "typescript": "~6.0.3",
+    "vitest": "^5.0.3"
+  },
+  "prettier": "@mstrict-actions/dev-tools/prettier"
+}

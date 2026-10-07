@@ -1,0 +1,37 @@
+name: Verified Terraform delivery
+description:
+  Preview, gate, deploy, and recover Terraform roots with signed receipts and
+  state archives.
+author: makeitstrict
+branding:
+  icon: shield
+  color: purple
+inputs:
+  operation:
+    description:
+      validate-config, preview, gate, deploy, check-no-changes, backup, or
+      download.
+    required: true
+  config:
+    description: Repository-local Terraform delivery configuration file.
+    required: false
+    default: .github/config/terraform-delivery.json
+  token:
+    description: GitHub token for exact preview and merge verification.
+    required: false
+outputs:
+  roots:
+    description: Comma-separated validated Terraform root names.
+  stale:
+    description: Whether the gate skipped an obsolete main run.
+  preview_artifact:
+    description: Exact signed preview artifact ID.
+  preview_run:
+    description: Exact successful preview run ID.
+  preview_attempt:
+    description: Exact successful preview attempt.
+  admitted:
+    description: Whether deployment applied the reviewed plans.
+runs:
+  using: node24
+  main: dist/index.js

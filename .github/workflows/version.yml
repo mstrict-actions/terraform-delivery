@@ -1,0 +1,29 @@
+name: Version
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  tag:
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: Tag commit
+        shell: bash
+        run: |
+          tag="0.$(git rev-list --count "$GITHUB_SHA")"
+          if git show-ref --verify --quiet "refs/tags/$tag"; then
+            if [ "$(git rev-parse "$tag^{commit}")" != "$GITHUB_SHA" ]; then
+              echo "Tag $tag already points to a different commit" >&2
+              exit 1
+            fi
+            echo "Tag $tag already exists for this commit"
+            exit 0
+          fi
+          git tag "$tag" "$GITHUB_SHA"
+          git push origin "refs/tags/$tag"

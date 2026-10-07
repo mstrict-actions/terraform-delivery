@@ -1,0 +1,11 @@
+{
+  "rootsDirectory": "tests/fixtures/multi",
+  "backendConfig": "tests/fixtures/terraform/backends/backend.hcl",
+  "backendConfigRelative": "../backends/backend.hcl",
+  "toolsFile": "tests/fixtures/tools.json",
+  "owner": "owner",
+  "defaultBranch": "main",
+  "previewWorkflow": "preview.yml",
+  "previewJobs": ["Terraform preview"],
+  "identityFiles": ["tests/fixtures/tools.json"]
+}

@@ -1,0 +1,8 @@
+name: Security and quality
+queries:
+  - uses: security-and-quality
+paths-ignore:
+  - node_modules
+  - dist
+  - coverage
+  - .agents/skills
