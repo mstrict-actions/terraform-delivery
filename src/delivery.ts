@@ -87,23 +87,25 @@ async function github(path: string): Promise<unknown> {
   const token = inputToken.length > 0 ? inputToken : process.env['GITHUB_TOKEN']
   if (token === undefined || token.length === 0)
     throw new Error('GitHub API token is required')
-  const response = await fetch(
-    `${process.env['GITHUB_API_URL'] ?? 'https://api.github.com'}/repos/${required('GITHUB_REPOSITORY')}${path}`,
-    {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: 'application/vnd.github+json',
-        'X-GitHub-Api-Version': '2022-11-28',
+  const repository = required('GITHUB_REPOSITORY')
+  try {
+    const response = await fetch(
+      `${process.env['GITHUB_API_URL'] ?? 'https://api.github.com'}/repos/${repository}${path}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/vnd.github+json',
+          'X-GitHub-Api-Version': '2022-11-28',
+        },
+        signal: AbortSignal.timeout(30_000),
       },
-      signal: AbortSignal.timeout(30_000),
-    },
-  )
-  if (!response.ok)
-    throw new Error(
-      `GitHub verification request failed (${response.status.toString()})`,
     )
-  const result: unknown = await response.json()
-  return result
+    if (!response.ok) throw new Error('GitHub verification request failed')
+    const result: unknown = await response.json()
+    return result
+  } catch {
+    throw new Error('GitHub verification request failed; response withheld')
+  }
 }
 async function pages(path: string, key: string): Promise<unknown[]> {
   const rows: unknown[] = []
@@ -376,13 +378,11 @@ export class Delivery {
     assertOwnerPR(pr, required('GITHUB_REPOSITORY'), this.config)
     return pr
   }
-  async gate(): Promise<void> {
-    if (!(await latestMain(this.config))) {
-      core.setOutput('stale', 'true')
-      this.report.add('Main advanced; stale deployment skipped.')
-      core.notice('Main advanced; stale deployment skipped')
-      return
-    }
+  private async admittedPreview(): Promise<{
+    pr: PullRequest
+    run: ReturnType<typeof parseWorkflowRun>
+    artifactId: string
+  }> {
     const pr = await this.mergedPR()
     const candidates = (
       await pages(
@@ -409,15 +409,20 @@ export class Delivery {
     const artifactId = matching
       .map((artifact): string => number(field(artifact, 'id')).toString())
       .join('')
+    return { pr, run: candidate, artifactId }
+  }
+  async gate(): Promise<void> {
+    if (!(await latestMain(this.config))) {
+      core.setOutput('stale', 'true')
+      this.report.add('Main advanced; stale deployment skipped.')
+      core.notice('Main advanced; stale deployment skipped')
+      return
+    }
+    const { pr, run: candidate, artifactId } = await this.admittedPreview()
     core.setOutput('preview_artifact', artifactId)
     core.setOutput('stale', 'false')
     core.setOutput('preview_run', candidate.id.toString())
     core.setOutput('preview_attempt', candidate.run_attempt.toString())
-    await writeFile(
-      resolve(privateDirectory, 'merge.json'),
-      JSON.stringify({ pr, run: candidate }),
-      { mode: 0o600 },
-    )
     this.report.add(
       `Owner merge of PR #${pr.number.toString()} admitted by preview run ${candidate.id.toString()}, attempt ${candidate.run_attempt.toString()}.`,
     )
@@ -428,11 +433,7 @@ export class Delivery {
     const reviewed = parseReceiptPayload(
       verify(receipt, required('TERRAFORM_DELIVERY_HMAC_KEY')),
     )
-    const merge: unknown = JSON.parse(
-      await readFile(resolve(privateDirectory, 'merge.json'), 'utf8'),
-    )
-    const pr = parsePullRequest(field(merge, 'pr'))
-    const previewRun = parseWorkflowRun(field(merge, 'run'))
+    const { pr, run: previewRun } = await this.admittedPreview()
     const attempt = parseWorkflowRun(
       await github(
         `/actions/runs/${previewRun.id.toString()}/attempts/${previewRun.run_attempt.toString()}`,

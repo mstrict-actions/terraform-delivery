@@ -56835,23 +56835,25 @@ async function github(path) {
   const token = inputToken.length > 0 ? inputToken : process.env["GITHUB_TOKEN"];
   if (token === void 0 || token.length === 0)
     throw new Error("GitHub API token is required");
-  const response = await fetch(
-    `${process.env["GITHUB_API_URL"] ?? "https://api.github.com"}/repos/${required("GITHUB_REPOSITORY")}${path}`,
-    {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: "application/vnd.github+json",
-        "X-GitHub-Api-Version": "2022-11-28"
-      },
-      signal: AbortSignal.timeout(3e4)
-    }
-  );
-  if (!response.ok)
-    throw new Error(
-      `GitHub verification request failed (${response.status.toString()})`
+  const repository = required("GITHUB_REPOSITORY");
+  try {
+    const response = await fetch(
+      `${process.env["GITHUB_API_URL"] ?? "https://api.github.com"}/repos/${repository}${path}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/vnd.github+json",
+          "X-GitHub-Api-Version": "2022-11-28"
+        },
+        signal: AbortSignal.timeout(3e4)
+      }
     );
-  const result = await response.json();
-  return result;
+    if (!response.ok) throw new Error("GitHub verification request failed");
+    const result = await response.json();
+    return result;
+  } catch {
+    throw new Error("GitHub verification request failed; response withheld");
+  }
 }
 async function pages(path, key) {
   const rows = [];
@@ -57094,13 +57096,7 @@ var Delivery = class _Delivery {
     assertOwnerPR(pr, required("GITHUB_REPOSITORY"), this.config);
     return pr;
   }
-  async gate() {
-    if (!await latestMain(this.config)) {
-      setOutput("stale", "true");
-      this.report.add("Main advanced; stale deployment skipped.");
-      notice("Main advanced; stale deployment skipped");
-      return;
-    }
+  async admittedPreview() {
     const pr = await this.mergedPR();
     const candidates = (await pages(
       `/actions/workflows/${encodeURIComponent(this.config.previewWorkflow)}/runs?event=pull_request&head_sha=${encodeURIComponent(pr.head.sha)}`,
@@ -57117,15 +57113,20 @@ var Delivery = class _Delivery {
     if (matching.length !== 1)
       throw new Error("Exact successful preview receipt artifact is missing");
     const artifactId = matching.map((artifact) => number(field3(artifact, "id")).toString()).join("");
+    return { pr, run: candidate, artifactId };
+  }
+  async gate() {
+    if (!await latestMain(this.config)) {
+      setOutput("stale", "true");
+      this.report.add("Main advanced; stale deployment skipped.");
+      notice("Main advanced; stale deployment skipped");
+      return;
+    }
+    const { pr, run: candidate, artifactId } = await this.admittedPreview();
     setOutput("preview_artifact", artifactId);
     setOutput("stale", "false");
     setOutput("preview_run", candidate.id.toString());
     setOutput("preview_attempt", candidate.run_attempt.toString());
-    await writeFile2(
-      resolve3(privateDirectory, "merge.json"),
-      JSON.stringify({ pr, run: candidate }),
-      { mode: 384 }
-    );
     this.report.add(
       `Owner merge of PR #${pr.number.toString()} admitted by preview run ${candidate.id.toString()}, attempt ${candidate.run_attempt.toString()}.`
     );
@@ -57136,11 +57137,7 @@ var Delivery = class _Delivery {
     const reviewed = parseReceiptPayload(
       verify(receipt, required("TERRAFORM_DELIVERY_HMAC_KEY"))
     );
-    const merge2 = JSON.parse(
-      await readFile5(resolve3(privateDirectory, "merge.json"), "utf8")
-    );
-    const pr = parsePullRequest(field3(merge2, "pr"));
-    const previewRun = parseWorkflowRun(field3(merge2, "run"));
+    const { pr, run: previewRun } = await this.admittedPreview();
     const attempt = parseWorkflowRun(
       await github(
         `/actions/runs/${previewRun.id.toString()}/attempts/${previewRun.run_attempt.toString()}`

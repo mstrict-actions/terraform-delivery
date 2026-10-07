@@ -229,6 +229,16 @@ describe('synthetic end-to-end delivery contract', (): void => {
     )
   })
 
+  it('rechecks the selected preview during deploy without gate scratch data', async (): Promise<void> => {
+    const delivery = await Delivery.create(
+      'tests/fixtures/config.json',
+      new Report(),
+    )
+    await delivery.preview()
+    await delivery.deploy()
+    expect(core.setOutput).toHaveBeenCalledWith('admitted', 'true')
+  })
+
   it('rejects changed fresh plans before state backup or apply', async (): Promise<void> => {
     const delivery = await Delivery.create(
       'tests/fixtures/config.json',
@@ -331,7 +341,7 @@ describe('synthetic end-to-end delivery contract', (): void => {
       new Report(),
     )
     synthetic.failingPath = '/repos/owner/repo/git/ref/heads/main'
-    await expect(delivery.gate()).rejects.toThrow('request failed (500)')
+    await expect(delivery.gate()).rejects.toThrow('response withheld')
     synthetic.failingPath = ''
     vi.stubEnv('GITHUB_TOKEN', '')
     await expect(delivery.gate()).rejects.toThrow('token is required')
