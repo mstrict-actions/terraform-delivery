@@ -113,7 +113,8 @@ function githubResponse(url: URL): Response {
   if (synthetic.api.has(path)) return response(synthetic.api.get(path))
   if (path.endsWith('/git/ref/heads/main'))
     return response({ object: { sha: synthetic.mainSha } })
-  if (path.endsWith('/commits/merge/pulls')) return response([pr])
+  if (path.endsWith('/commits/merge/pulls'))
+    return response([{ ...pr, merged_by: undefined }])
   if (path.endsWith('/pulls/7')) return response(pr)
   if (path.endsWith('/actions/workflows/preview.yml/runs'))
     return response({ workflow_runs: [workflowRun] })
@@ -320,6 +321,11 @@ describe('synthetic end-to-end delivery contract', (): void => {
     synthetic.api.set(`${prefix}/commits/merge/pulls`, [])
     await expect(delivery.gate()).rejects.toThrow('exactly one')
     synthetic.api.delete(`${prefix}/commits/merge/pulls`)
+    synthetic.api.set(`${prefix}/pulls/7`, {
+      ...pr,
+      merge_commit_sha: 'different',
+    })
+    await expect(delivery.gate()).rejects.toThrow('changed during verification')
     synthetic.api.set(`${prefix}/pulls/7`, {
       ...pr,
       merged_by: { login: 'other' },

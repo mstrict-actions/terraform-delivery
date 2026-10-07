@@ -355,22 +355,24 @@ export class Delivery {
   private async mergedPR(): Promise<PullRequest> {
     const sha = required('GITHUB_SHA')
     const rows = await github(`/commits/${sha}/pulls?per_page=100`)
-    const matches = array(rows)
-      .map(parsePullRequest)
-      .filter(
-        (pr): boolean =>
-          pr.merged_at !== null &&
-          pr.merge_commit_sha === sha &&
-          pr.base.ref === this.config.defaultBranch,
-      )
+    const matches = array(rows).filter(
+      (row): boolean =>
+        field(row, 'merged_at') !== null &&
+        field(row, 'merge_commit_sha') === sha &&
+        field(field(row, 'base'), 'ref') === this.config.defaultBranch,
+    )
     if (matches.length !== 1)
       throw new Error(
         'Main commit must be the merge of exactly one reviewed PR',
       )
-    const prNumber = matches
-      .map((match): string => match.number.toString())
-      .join('')
-    const pr = parsePullRequest(await github(`/pulls/${prNumber}`))
+    const prNumber = number(field(matches[0], 'number'))
+    const pr = parsePullRequest(await github(`/pulls/${prNumber.toString()}`))
+    if (
+      pr.number !== prNumber ||
+      pr.merge_commit_sha !== sha ||
+      pr.merged_at === null
+    )
+      throw new Error('Merged pull request changed during verification')
     if (pr.merged_by?.login !== this.config.owner)
       throw new Error(
         'Only the configured owner may merge infrastructure changes',
