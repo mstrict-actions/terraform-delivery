@@ -33,7 +33,7 @@
   "dependencies": {
     "@actions/core": "^3.0.1",
     "@aws-sdk/client-s3": "^3.1146.0",
-    "lossless-json": "^4.3.1"
+    "lossless-json": "^4.3.2"
   },
   "devDependencies": {
     "@mstrict-actions/dev-tools": "git+https://github.com/mstrict-actions/dev-tools.git#0.5",
